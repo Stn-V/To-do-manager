@@ -7,7 +7,6 @@ class TaskManager:
         self.storage = storage
         self.tasks: List[Task] = self.storage.load()
         self.next_id = self.generate_id()
-
     def generate_id(self):
         if not self.tasks:
             return 1

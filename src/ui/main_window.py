@@ -19,6 +19,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(widget)
         self.task_widgets.append(widget)
         widget.deleted.connect(self.task_delete)
+        widget.edited.connect(self.task_edited)
 
         self.add_btn = QPushButton("Добавить задачу")
         self.layout.addWidget(self.add_btn)
@@ -42,5 +43,14 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(widget)
         self.task_widgets.append(widget)
         widget.deleted.connect(self.task_delete)
+        widget.edited.connect(self.task_edited)
+
+    def task_edited(self, task):
+        print("MainWindow получил обновлённую задачу:", task)
+        for widget in self.task_widgets:
+            if widget.task == task:
+                break
+
+
 
 

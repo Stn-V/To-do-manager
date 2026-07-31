@@ -1,5 +1,5 @@
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtWidgets import ( QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget)
+from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QInputDialog)
 from PySide6.QtGui import QFont
 
 class TaskWidget(QWidget):
@@ -44,9 +44,21 @@ class TaskWidget(QWidget):
     def delete_btn_clicked(self ):
         print("Удаляем задачу:", self.task)
         self.deleted.emit(self.task)
+
     def edit_btn_clicked(self):
         print("Редактируем задачу:", self.task)
+        new_task, ok = QInputDialog.getText(self,"Редактирование задачи", "Новое название:", text = self._get("task"))
+        if not ok:
+            return
+        new_dedline, ok = QInputDialog.getText(self, "Редактирование дедлайна", "Новый дедлайн:", text = self._get("dedline"))
+        if not ok:
+            return
+        self.task["task"] = new_task
+        self.task["dedline"] = new_dedline
+        self.task_label.setText(new_task)
+        self.dedline_label.setText(new_dedline)
         self.edited.emit(self.task)
+
     def state_status(self, state ):
         if self.checkBox.isChecked():
             print("Задача выполнена ", self._get("task"))
@@ -55,5 +67,4 @@ class TaskWidget(QWidget):
             print("Задача не выполнена ", self._get("task"))
             self.task_label.setStyleSheet("")
         self.status_changed.emit(self.task)
-
 
