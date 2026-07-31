@@ -25,8 +25,9 @@ class Task:
             "deadline": self.deadline.isoformat() if self.deadline else None,
             "created_at": self.created_at.isoformat(),
         }
-    @staticmethod
-    def from_dict(data: dict) -> "Task":
+
+    @classmethod
+    def from_dict(cls,data: dict) -> "Task":
         return Task(
             id=data["id"],
             title=data["title"],
@@ -35,4 +36,5 @@ class Task:
             deadline=data["deadline"] if data.get("deadline") else None,
             created_at=datetime.fromisoformat(data["created_at"]),
         )
-
+    def is_done(self) -> bool:
+        return self.status == Status.COMPLETED

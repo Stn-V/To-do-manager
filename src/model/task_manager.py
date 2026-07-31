@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from model.task import Task, Status
 from model.storage import Storage
@@ -18,3 +18,19 @@ class TaskManager:
         self.next_id +=1
         self.storage.save(self.tasks)
         return task
+
+    def list_tasks(self, include_done: bool = True) -> List[Task]:
+        tasks = self.tasks
+        if not include_done:
+            tasks = [t for t in tasks if not t.is_done()]
+        return sorted(tasks, key=lambda t: (t.due_date is None, t.due_date))
+
+
+    def get_due_soon(self, within_minutes: int = 30) -> List[Task]:
+        now = datetime.now()
+        threshold = now + timedelta(minutes=within_minutes)
+        return [
+            t
+            for t in self.tasks
+            if not t.is_done() and t.deadline and now <= t.deadline <= threshold
+        ]
