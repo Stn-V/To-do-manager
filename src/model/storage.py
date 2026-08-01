@@ -10,12 +10,21 @@ class Storage:
     def exist(self):
         if not os.path.exists(self.filepath):
             with open(self.filepath, "w") as f:
-                json.dump({}, f, indent=4)
+                json.dump([], f, indent=4)
 
-    def load(self):
-        with open(self.filepath, "r") as f:
-           input_data = json.load(f)
-        return(Task.from_dict(item) for item in input_data)
+    def load(self) -> List[Task]:
+        try:
+            with open(self.filepath, "r") as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                return []
+            return [Task.from_dict(item) for item in data]
+        except (json.JSONDecodeError, FileNotFoundError):
+            with open(self.filepath, "w") as f:
+                json.dump([], f, indent=4)
+            return []
+
+
 
     def save(self, tasks: List[Task]):
         data = [task.to_dict() for task in tasks]

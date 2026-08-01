@@ -33,7 +33,7 @@ class Task:
             title=data["title"],
             status=Status(data["status"]),
             description=data["description"],
-            deadline=data["deadline"] if data.get("deadline") else None,
+            deadline=datetime.fromisoformat(data["deadline"]) if data.get("deadline") else None,
             created_at=datetime.fromisoformat(data["created_at"]),
         )
     def is_done(self) -> bool:
