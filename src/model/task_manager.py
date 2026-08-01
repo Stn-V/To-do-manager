@@ -22,7 +22,7 @@ class TaskManager:
         tasks = self.tasks
         if not include_done:
             tasks = [t for t in tasks if not t.is_done()]
-        return sorted(tasks, key=lambda t: (t.due_date is None, t.due_date))
+        return sorted(tasks, key=lambda t: (t.deadline is None, t.deadline))
 
 
     def get_due_soon(self, within_minutes: int = 30) -> List[Task]:
