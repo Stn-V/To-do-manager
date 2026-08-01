@@ -134,7 +134,7 @@ class TaskManager:
         tasks = self.one_time_tasks + self.recurring_tasks
         if not include_done:
             tasks = [t for t in tasks if not t.is_done()]
-        return sorted(tasks, key=lambda t: (t.due_date is None, t.due_date))
+        return sorted(tasks, key=lambda t: (t.deadline is None, t.deadline or datetime.max))
 
 
     def get_due_soon(self, within_minutes: int = 30) -> List[Task]:
