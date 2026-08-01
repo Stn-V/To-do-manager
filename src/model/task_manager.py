@@ -28,7 +28,7 @@ class TaskManager:
         all_ids = [t.id for t in self.one_time_tasks + self.recurring_tasks]
         return max(all_ids) + 1 if all_ids else 1
 
-    def find(self, task_id: int) -> Optional[Task]:
+    def _find(self, task_id: int) -> Optional[Task]:
         for task in self.one_time_tasks + self.recurring_tasks:
             if task.id == task_id:
                 return task
