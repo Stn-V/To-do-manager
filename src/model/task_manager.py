@@ -8,6 +8,7 @@ class TaskManager:
         self.recurring_storage = recurring_storage
         self.one_time_tasks: List[Task] = self.storage.load()
         self.recurring_tasks: List[Task] = self.recurring_storage.load()
+        self.reset_recurring_if_new_day()
         self.next_id = self.generate_id()
 
     def reset_recurring_if_new_day(self) -> None:
@@ -68,6 +69,66 @@ class TaskManager:
         self.next_id += 1
         self.recurring_storage.save(self.recurring_tasks)
         return task
+
+    def complete_task(self, task_id: int) -> None:
+        """Разовая задача при выполнении НЕ удаляется — просто получает статус COMPLETED.
+        Постоянная — увеличивает счётчик выполнений на сегодня."""
+        task = self._find(task_id)
+        if task is None:
+            return
+
+        if task.task_type == TaskType.ONE_TIME:
+            task.status = Status.COMPLETED
+            self.storage.save(self.one_time_tasks)
+        else:
+            task.completions_today += 1
+            if task.completions_today >= task.times_per_day:
+                task.status = Status.COMPLETED
+            self.recurring_storage.save(self.recurring_tasks)
+
+    def get_task(self, task_id: int) -> Optional[Task]:
+        return self._find(task_id)
+
+    def edit_task(
+            self,
+            task_id: int,
+            title: str,
+            description: Optional[str] = None,
+            deadline: Optional[datetime] = None,
+            times_per_day: Optional[int] = None,
+    ) -> None:
+        """Редактирование задачи. Для ONE_TIME обновляется дедлайн (None — снять дедлайн),
+        для RECURRING — сколько раз в день нужно выполнить."""
+        task = self._find(task_id)
+        if task is None:
+            return
+
+        task.title = title
+        if description is not None:
+            task.description = description
+
+        if task.task_type == TaskType.ONE_TIME:
+            task.deadline = deadline
+            self.storage.save(self.one_time_tasks)
+        else:
+            if times_per_day is not None:
+                task.times_per_day = max(1, times_per_day)
+                if task.completions_today > task.times_per_day:
+                    task.completions_today = task.times_per_day
+            self.recurring_storage.save(self.recurring_tasks)
+
+    def delete_task(self, task_id: int) -> None:
+        """Ручное удаление задачи любого типа."""
+        task = self._find(task_id)
+        if task is None:
+            return
+
+        if task.task_type == TaskType.ONE_TIME:
+            self.one_time_tasks.remove(task)
+            self.storage.save(self.one_time_tasks)
+        else:
+            self.recurring_tasks.remove(task)
+            self.recurring_storage.save(self.recurring_tasks)
 
     def list_tasks(self, include_done: bool = True) -> List[Task]:
         tasks = self.one_time_tasks + self.recurring_tasks

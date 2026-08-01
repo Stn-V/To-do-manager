@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "title": "bread",
+    "status": "completed",
+    "description": "",
+    "deadline": "2026-08-01T16:16:00",
+    "created_at": "2026-08-01T16:14:20.139329",
+    "task_type": "one_time",
+    "times_per_day": 1,
+    "completions_today": 0,
+    "last_reset_date": null
+  }
+]
