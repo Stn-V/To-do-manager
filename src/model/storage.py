@@ -1,23 +1,37 @@
-import json
 import os
-from  typing import List
+import json
 from model.task import Task
+
+
 class Storage:
-    def __init__(self, filepath:str):
+    def __init__(self, filepath: str):
         self.filepath = filepath
-        self.exist()
-        
-    def exist(self):
+        self._ensure_exists()
+
+    def _ensure_exists(self):
+        # создаём директорию, если её нет
+        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+
+        # создаём файл, если его нет
         if not os.path.exists(self.filepath):
-            with open(self.filepath, "w") as f:
-                json.dump([], f, indent=4)
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump([], f)
 
     def load(self):
-        with open(self.filepath, "r") as f:
-           input_data = json.load(f)
-        return[Task.from_dict(item) for item in input_data]
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except json.JSONDecodeError:
+            # файл повреждён → восстанавливаем
+            raw = []
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump([], f)
 
-    def save(self, tasks: List[Task]):
-        data = [task.to_dict() for task in tasks]
-        with open(self.filepath, "w") as f:
-            json.dump(data, f, indent=4)
+        return [Task.from_dict(item) for item in raw]
+
+    def save(self, tasks):
+        serializable = [t.to_dict() for t in tasks]
+
+        with open(self.filepath, "w", encoding="utf-8") as f:
+            json.dump(serializable, f, ensure_ascii=False, indent=2)
+
