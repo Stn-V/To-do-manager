@@ -1,15 +1,18 @@
 from datetime import datetime
 
 from PySide6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
+    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog, QSystemTrayIcon, QStyle
 )
 
+from background.notifier import DeadLineNotifier
 from ui.task_widjet import TaskWidget
 from model.task import TaskType, Task
 from model.task_manager import TaskManager
 from model.storage import Storage
 from src.config import TASKS_FILE, RECURRING_TASKS_FILE
 
+from PySide6.QtCore import QTimer
+from src.background import notifier
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -45,7 +48,29 @@ class MainWindow(QMainWindow):
         self.add_one_time_btn.clicked.connect(self.add_one_time_task)
         self.add_recurring_btn.clicked.connect(self.add_recurring_task)
 
+        self.ui_refresh_timer = QTimer(self)
+        self.ui_refresh_timer.timeout.connect(self.refresh_all_widgets)
+        self.ui_refresh_timer.start(30000)
+
+        self.tray_icon = QSystemTrayIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation), self)
+
+        self.tray_icon.setToolTip("To-Do Manager")
+        self.tray_icon.show()
+
+        self.notifier = DeadLineNotifier(self.task_manager, self.tray_icon)
+        self.notifier.start()
+
+
     # ---------- отрисовка ----------
+
+    def closeEvent(self, event ):
+        self.ui_refresh_timer.stop()
+        self.notifier.stop()
+        super().closeEvent(event)
+
+    def refresh_all_widgets(self) -> None:
+        for widget in self.task_widgets.values():
+            widget.refresh()
 
     def render_tasks(self) -> None:
         for task in self.task_manager.list_tasks():
