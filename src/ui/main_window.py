@@ -1,18 +1,13 @@
 from datetime import datetime
 
-from PySide6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog, QSystemTrayIcon, QStyle
-)
+from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,)
 
-from background.notifier import DeadLineNotifier
 from ui.task_widjet import TaskWidget
 from model.task import TaskType, Task
 from model.task_manager import TaskManager
 from model.storage import Storage
 from src.config import TASKS_FILE, RECURRING_TASKS_FILE
 
-from PySide6.QtCore import QTimer
-from src.background import notifier
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -91,30 +86,42 @@ class MainWindow(QMainWindow):
         self.tasks_layout.removeWidget(widget)
         widget.deleteLater()
 
-    # ---------- добавление задач ----------
-
     def add_one_time_task(self) -> None:
         title, ok = QInputDialog.getText(self, "Новая задача", "Название:")
         if not ok or not title.strip():
+            return
+        description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):"
+        )
+        if not ok:
             return
         dt_text, ok = QInputDialog.getText(
             self, "Дедлайн", "Дедлайн (ДД.ММ.ГГГГ ЧЧ:ММ, можно оставить пустым):"
         )
         if not ok:
             return
-        task = self.task_manager.add_task(title.strip(), deadline=self._parse_deadline(dt_text))
+        task = self.task_manager.add_task(
+            title.strip(), description=description.strip(), deadline=self._parse_deadline(dt_text)
+        )
         self._add_widget_for(task)
 
     def add_recurring_task(self) -> None:
         title, ok = QInputDialog.getText(self, "Новая постоянная задача", "Название:")
         if not ok or not title.strip():
             return
+        description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):"
+        )
+        if not ok:
+            return
         times, ok = QInputDialog.getInt(
             self, "Сколько раз в день", "Раз в день:", value=1, minValue=1, maxValue=50
         )
         if not ok:
             return
-        task = self.task_manager.add_recurring_task(title.strip(), times_per_day=times)
+        task = self.task_manager.add_recurring_task(
+            title.strip(), description=description.strip(), times_per_day=times
+        )
         self._add_widget_for(task)
 
     @staticmethod
@@ -156,6 +163,12 @@ class MainWindow(QMainWindow):
         if not ok or not new_title.strip():
             return
 
+        new_description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):", text=task.description
+        )
+        if not ok:
+            return
+
         if task.task_type == TaskType.ONE_TIME:
             current = task.deadline.strftime("%d.%m.%Y %H:%M") if task.deadline else ""
             dt_text, ok = QInputDialog.getText(
@@ -165,7 +178,8 @@ class MainWindow(QMainWindow):
             if not ok:
                 return
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), deadline=self._parse_deadline(dt_text)
+                task_id, title=new_title.strip(), description=new_description.strip(),
+                deadline=self._parse_deadline(dt_text)
             )
         else:
             new_times, ok = QInputDialog.getInt(
@@ -175,7 +189,8 @@ class MainWindow(QMainWindow):
             if not ok:
                 return
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), times_per_day=new_times
+                task_id, title=new_title.strip(), description=new_description.strip(),
+                times_per_day=new_times
             )
 
         updated = self.task_manager.get_task(task_id)

@@ -1,3 +1,4 @@
+
 from datetime import datetime, timedelta, date
 from typing import Optional, List
 from model.task import Task, Status, TaskType
@@ -88,6 +89,17 @@ class TaskManager:
 
     def get_task(self, task_id: int) -> Optional[Task]:
         return self._find(task_id)
+
+    def purge_completed_one_time(self) -> None:
+        """Удаляет выполненные разовые задачи. Вызывается при закрытии программы,
+        чтобы в течение сессии выполненная задача была видна (зачёркнута),
+        а при следующем запуске уже не отображалась."""
+        before = len(self.one_time_tasks)
+        self.one_time_tasks = [
+            t for t in self.one_time_tasks if t.status != Status.COMPLETED
+        ]
+        if len(self.one_time_tasks) != before:
+            self.storage.save(self.one_time_tasks)
 
     def edit_task(
             self,

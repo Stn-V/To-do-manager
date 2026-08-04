@@ -1,14 +1,14 @@
 [
   {
-    "id": 4,
+    "id": 10,
     "title": "water",
-    "status": "completed",
-    "description": "",
+    "status": "todo",
+    "description": "drink a cup of water",
     "deadline": null,
-    "created_at": "2026-08-01T16:57:12.725331",
+    "created_at": "2026-08-04T11:41:00.389749",
     "task_type": "recurring",
-    "times_per_day": 3,
-    "completions_today": 16,
-    "last_reset_date": "2026-08-03"
+    "times_per_day": 5,
+    "completions_today": 3,
+    "last_reset_date": "2026-08-04"
   }
 ]
