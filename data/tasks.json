@@ -2,10 +2,22 @@
   {
     "id": 3,
     "title": "bread",
-    "status": "todo",
+    "status": "completed",
     "description": "",
     "deadline": null,
     "created_at": "2026-08-01T16:57:01.385784",
+    "task_type": "one_time",
+    "times_per_day": 1,
+    "completions_today": 0,
+    "last_reset_date": null
+  },
+  {
+    "id": 5,
+    "title": "Задача",
+    "status": "completed",
+    "description": "",
+    "deadline": "2026-08-01T17:40:00",
+    "created_at": "2026-08-01T17:38:54.551515",
     "task_type": "one_time",
     "times_per_day": 1,
     "completions_today": 0,

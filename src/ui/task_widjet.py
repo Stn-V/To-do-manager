@@ -42,7 +42,10 @@ class TaskWidget(QWidget):
                 f"🔁 {self.task.completions_today}/{self.task.times_per_day} раз сегодня"
             )
         elif self.task.deadline:
-            self.info_label.setText(f"до {self.task.deadline:%d.%m %H:%M}")
+            if self.task.is_expired():
+                self.info_label.setText(f"⚠️ просрочено (было до {self.task.deadline:%d.%m %H:%M})")
+            else:
+                self.info_label.setText(f"до {self.task.deadline:%d.%m %H:%M}")
         else:
             self.info_label.setText("без дедлайна")
 
@@ -52,6 +55,8 @@ class TaskWidget(QWidget):
 
         if self.task.is_done():
             self.task_label.setStyleSheet("text-decoration: line-through; color: gray;")
+        elif self.task.is_expired():
+            self.task_label.setStyleSheet("color: red; font-weight: bold;")
         else:
             self.task_label.setStyleSheet("")
 
