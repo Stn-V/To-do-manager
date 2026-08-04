@@ -43,11 +43,29 @@ class MainWindow(QMainWindow):
         self.add_one_time_btn.clicked.connect(self.add_one_time_task)
         self.add_recurring_btn.clicked.connect(self.add_recurring_task)
 
-    def closeEvent(self, event) -> None:
-        # выполненные разовые задачи остаются видимыми (зачёркнутыми) в течение
-        # сессии, но удаляются насовсем при закрытии программы
-        self.task_manager.purge_completed_one_time()
+        self.ui_refresh_timer = QTimer(self)
+        self.ui_refresh_timer.timeout.connect(self.refresh_all_widgets)
+        self.ui_refresh_timer.start(30000)
+
+        self.tray_icon = QSystemTrayIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation), self)
+
+        self.tray_icon.setToolTip("To-Do Manager")
+        self.tray_icon.show()
+
+        self.notifier = DeadLineNotifier(self.task_manager, self.tray_icon)
+        self.notifier.start()
+
+
+    # ---------- отрисовка ----------
+
+    def closeEvent(self, event ):
+        self.ui_refresh_timer.stop()
+        self.notifier.stop()
         super().closeEvent(event)
+
+    def refresh_all_widgets(self) -> None:
+        for widget in self.task_widgets.values():
+            widget.refresh()
 
     def render_tasks(self) -> None:
         for task in self.task_manager.list_tasks():

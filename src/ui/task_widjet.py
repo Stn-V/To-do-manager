@@ -59,6 +59,8 @@ class TaskWidget(QWidget):
 
         if self.task.is_done():
             self.task_label.setStyleSheet("text-decoration: line-through; color: gray;")
+        elif self.task.is_expired():
+            self.task_label.setStyleSheet("color: red; font-weight: bold;")
         else:
             self.task_label.setStyleSheet("")
 
