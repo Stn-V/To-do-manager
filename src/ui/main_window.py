@@ -1,8 +1,6 @@
 from datetime import datetime
 
-from PySide6.QtWidgets import (
-    QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
-)
+from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,)
 
 from ui.task_widjet import TaskWidget
 from model.task import TaskType, Task
@@ -45,7 +43,11 @@ class MainWindow(QMainWindow):
         self.add_one_time_btn.clicked.connect(self.add_one_time_task)
         self.add_recurring_btn.clicked.connect(self.add_recurring_task)
 
-    # ---------- отрисовка ----------
+    def closeEvent(self, event) -> None:
+        # выполненные разовые задачи остаются видимыми (зачёркнутыми) в течение
+        # сессии, но удаляются насовсем при закрытии программы
+        self.task_manager.purge_completed_one_time()
+        super().closeEvent(event)
 
     def render_tasks(self) -> None:
         for task in self.task_manager.list_tasks():
@@ -66,30 +68,42 @@ class MainWindow(QMainWindow):
         self.tasks_layout.removeWidget(widget)
         widget.deleteLater()
 
-    # ---------- добавление задач ----------
-
     def add_one_time_task(self) -> None:
         title, ok = QInputDialog.getText(self, "Новая задача", "Название:")
         if not ok or not title.strip():
+            return
+        description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):"
+        )
+        if not ok:
             return
         dt_text, ok = QInputDialog.getText(
             self, "Дедлайн", "Дедлайн (ДД.ММ.ГГГГ ЧЧ:ММ, можно оставить пустым):"
         )
         if not ok:
             return
-        task = self.task_manager.add_task(title.strip(), deadline=self._parse_deadline(dt_text))
+        task = self.task_manager.add_task(
+            title.strip(), description=description.strip(), deadline=self._parse_deadline(dt_text)
+        )
         self._add_widget_for(task)
 
     def add_recurring_task(self) -> None:
         title, ok = QInputDialog.getText(self, "Новая постоянная задача", "Название:")
         if not ok or not title.strip():
             return
+        description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):"
+        )
+        if not ok:
+            return
         times, ok = QInputDialog.getInt(
             self, "Сколько раз в день", "Раз в день:", value=1, minValue=1, maxValue=50
         )
         if not ok:
             return
-        task = self.task_manager.add_recurring_task(title.strip(), times_per_day=times)
+        task = self.task_manager.add_recurring_task(
+            title.strip(), description=description.strip(), times_per_day=times
+        )
         self._add_widget_for(task)
 
     @staticmethod
@@ -131,6 +145,12 @@ class MainWindow(QMainWindow):
         if not ok or not new_title.strip():
             return
 
+        new_description, ok = QInputDialog.getMultiLineText(
+            self, "Описание", "Описание задачи (можно оставить пустым):", text=task.description
+        )
+        if not ok:
+            return
+
         if task.task_type == TaskType.ONE_TIME:
             current = task.deadline.strftime("%d.%m.%Y %H:%M") if task.deadline else ""
             dt_text, ok = QInputDialog.getText(
@@ -140,7 +160,8 @@ class MainWindow(QMainWindow):
             if not ok:
                 return
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), deadline=self._parse_deadline(dt_text)
+                task_id, title=new_title.strip(), description=new_description.strip(),
+                deadline=self._parse_deadline(dt_text)
             )
         else:
             new_times, ok = QInputDialog.getInt(
@@ -150,7 +171,8 @@ class MainWindow(QMainWindow):
             if not ok:
                 return
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), times_per_day=new_times
+                task_id, title=new_title.strip(), description=new_description.strip(),
+                times_per_day=new_times
             )
 
         updated = self.task_manager.get_task(task_id)
