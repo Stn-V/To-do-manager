@@ -1,7 +1,10 @@
 from datetime import datetime
 
-from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,)
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
+                               QSystemTrayIcon, QStyle, )
 
+from background.notifier import DeadLineNotifier
 from ui.task_widjet import TaskWidget
 from model.task import TaskType, Task
 from model.task_manager import TaskManager
@@ -58,9 +61,12 @@ class MainWindow(QMainWindow):
 
     # ---------- отрисовка ----------
 
-    def closeEvent(self, event ):
+    def closeEvent(self, event):
         self.ui_refresh_timer.stop()
         self.notifier.stop()
+        # выполненные разовые задачи остаются видимыми (зачёркнутыми) в течение
+        # сессии, но удаляются насовсем при закрытии программы
+        self.task_manager.purge_completed_one_time()
         super().closeEvent(event)
 
     def refresh_all_widgets(self) -> None:

@@ -1,17 +1,5 @@
 [
   {
-    "id": 5,
-    "title": "sth",
-    "status": "todo",
-    "description": "",
-    "deadline": "2026-08-03T16:04:00",
-    "created_at": "2026-08-03T15:32:30.020642",
-    "task_type": "one_time",
-    "times_per_day": 1,
-    "completions_today": 0,
-    "last_reset_date": null
-  },
-  {
     "id": 8,
     "title": "go for a walk",
     "status": "todo",
