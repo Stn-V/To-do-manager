@@ -1,6 +1,6 @@
 import os
 import json
-from model.task import Task
+from src.model.task import Task
 
 
 class Storage:
