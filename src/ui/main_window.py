@@ -1,5 +1,4 @@
 from datetime import datetime
-
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
                                QSystemTrayIcon, QStyle, )
@@ -10,6 +9,7 @@ from src.model.task import TaskType, Task
 from src.model.task_manager import TaskManager
 from src.model.storage import Storage
 from src.config import TASKS_FILE, RECURRING_TASKS_FILE
+from PySide6.QtWidgets import QComboBox
 
 
 class MainWindow(QMainWindow):
@@ -41,6 +41,12 @@ class MainWindow(QMainWindow):
         self.add_recurring_btn = QPushButton("+ Постоянная задача")
         btn_row.addWidget(self.add_one_time_btn)
         btn_row.addWidget(self.add_recurring_btn)
+        self.sort_combo = QComboBox()
+        self.sort_combo.addItem("По дедлайну", "deadline")
+        self.sort_combo.addItem("По приоритету", "priority")
+        self.sort_combo.addItem("Вручную", "order")
+        self.sort_combo.currentIndexChanged.connect(self.on_sort_mode_changed)
+        btn_row.addWidget(self.sort_combo)
         self.layout.addLayout(btn_row)
 
         self.add_one_time_btn.clicked.connect(self.add_one_time_task)
@@ -84,6 +90,8 @@ class MainWindow(QMainWindow):
         widget.deleted.connect(self.task_delete)
         widget.edit_requested.connect(self.task_edit_requested)
         widget.status_changed.connect(self.task_status_changed)
+        widget.decrement_requested.connect(self.task_decrement)
+        widget.order_changed.connect(self.task_order_changed)
 
     def _remove_widget(self, task_id: int) -> None:
         widget = self.task_widgets.pop(task_id, None)
@@ -106,8 +114,11 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
+        priority, ok = QInputDialog.getInt(self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10)
+        if not ok:
+            return
         task = self.task_manager.add_task(
-            title.strip(), description=description.strip(), deadline=self._parse_deadline(dt_text)
+            title.strip(), description=description.strip(), deadline=self._parse_deadline(dt_text), priority=priority,
         )
         self._add_widget_for(task)
 
@@ -125,8 +136,16 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
+        priority, ok = QInputDialog.getInt(
+            self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10
+        )
+        if not ok:
+            return
         task = self.task_manager.add_recurring_task(
-            title.strip(), description=description.strip(), times_per_day=times
+            title.strip(),
+            description=description.strip(),
+            times_per_day=times,
+            priority=priority,
         )
         self._add_widget_for(task)
 
@@ -174,6 +193,12 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
+        new_priority, ok = QInputDialog.getInt(
+            self, "Приоритет", "Приоритет (1–10):",
+            value=task.priority, minValue=1, maxValue=10,
+        )
+        if not ok:
+            return
 
         if task.task_type == TaskType.ONE_TIME:
             current = task.deadline.strftime("%d.%m.%Y %H:%M") if task.deadline else ""
@@ -185,7 +210,8 @@ class MainWindow(QMainWindow):
                 return
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
-                deadline=self._parse_deadline(dt_text)
+                deadline=self._parse_deadline(dt_text),
+                priority = new_priority
             )
         else:
             new_times, ok = QInputDialog.getInt(
@@ -196,10 +222,46 @@ class MainWindow(QMainWindow):
                 return
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
-                times_per_day=new_times
+                times_per_day=new_times,
+                priority = new_priority
             )
 
         updated = self.task_manager.get_task(task_id)
         widget = self.task_widgets[task_id]
         widget.task = updated
         widget.refresh()
+
+    def task_decrement(self, task_id: int) -> None:
+        self.task_manager.decrement_task(task_id)
+        task = self.task_manager.get_task(task_id)
+        if task is not None:
+            widget = self.task_widgets[task_id]
+            widget.task = task
+            widget.refresh()
+
+    def task_order_changed(self, task_id: int, new_index: int) -> None:
+        self.task_manager.sort_mode = "order"
+        idx = self.sort_combo.findData("order")
+        if idx != -1:
+            self.sort_combo.blockSignals(True)
+            self.sort_combo.setCurrentIndex(idx)
+            self.sort_combo.blockSignals(False)
+        self.task_manager.update_order(task_id, new_index)
+        self._rerender_all_tasks()
+
+    def _rerender_all_tasks(self) -> None:
+        # удаляем все виджеты
+        for widget in self.task_widgets.values():
+            self.tasks_layout.removeWidget(widget)
+            widget.deleteLater()
+        self.task_widgets.clear()
+        # создаём заново в новом порядке
+        for task in self.task_manager.list_tasks():
+            self._add_widget_for(task)
+
+    def on_sort_mode_changed(self, index: int) -> None:
+        mode = self.sort_combo.itemData(index)
+        self.task_manager.sort_mode = mode
+        self._rerender_all_tasks()
+
+
