@@ -1,8 +1,8 @@
 
 from datetime import datetime, timedelta, date
 from typing import Optional, List
-from model.task import Task, Status, TaskType
-from model.storage import Storage
+from src.model.task import Task, Status, TaskType
+from src.model.storage import Storage
 class TaskManager:
     def __init__(self, storage: Storage, recurring_storage: Storage):
         self.storage = storage

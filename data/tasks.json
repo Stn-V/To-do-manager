@@ -12,12 +12,12 @@
     "last_reset_date": null
   },
   {
-    "id": 9,
+    "id": 11,
     "title": "cleaning",
     "status": "todo",
-    "description": "washing yhe dishes and cleaning windows",
+    "description": "",
     "deadline": null,
-    "created_at": "2026-08-04T11:38:15.736569",
+    "created_at": "2026-08-07T12:47:26.233565",
     "task_type": "one_time",
     "times_per_day": 1,
     "completions_today": 0,
