@@ -23,6 +23,8 @@ class Task:
     times_per_day: int = 1  # сколько раз в день нужно выполнить (напр. попить воды x4)
     completions_today: int = 0  # сколько раз уже выполнено сегодня
     last_reset_date: Optional[date] = None  # когда последний раз обнулялся счётчик
+    priority: int = 1 #1 = низкий, 5 = высокий
+    order:int = 0 #позиция в списке при ручной сортировке
 
     def to_dict(self) -> dict:
         return {
@@ -36,6 +38,8 @@ class Task:
             "times_per_day": self.times_per_day,
             "completions_today": self.completions_today,
             "last_reset_date": self.last_reset_date.isoformat() if self.last_reset_date else None,
+            "priority": self.priority,
+            "order": self.order,
         }
 
     @classmethod
@@ -51,6 +55,8 @@ class Task:
             times_per_day=data.get("times_per_day", 1),
             completions_today=data.get("completions_today", 0),
             last_reset_date=date.fromisoformat(data["last_reset_date"]) if data.get("last_reset_date") else None,
+            priority=data.get("priority", 1),
+            order=data.get("order", 0),
         )
 
     def is_done(self) -> bool:
