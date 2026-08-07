@@ -3,7 +3,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QSystemTrayIcon
 
 from src.config import DEADLINE_CHECK_INTERVAL_MS, DEADLINE_WINDOW_MINUTES
-from model.task_manager import TaskManager
+from src.model.task_manager import TaskManager
 class DeadLineNotifier:
     def __init__(self, task_manager: TaskManager, tray_icon: QSystemTrayIcon)->None:
         self.task_manager = task_manager

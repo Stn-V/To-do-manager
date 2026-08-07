@@ -2,11 +2,12 @@ from datetime import datetime
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
                                QSystemTrayIcon, QStyle, )
-from background.notifier import DeadLineNotifier
-from ui.task_widjet import TaskWidget
-from model.task import TaskType, Task
-from model.task_manager import TaskManager
-from model.storage import Storage
+
+from src.background.notifier import DeadLineNotifier
+from src.ui.task_widjet import TaskWidget
+from src.model.task import TaskType, Task
+from src.model.task_manager import TaskManager
+from src.model.storage import Storage
 from src.config import TASKS_FILE, RECURRING_TASKS_FILE
 from PySide6.QtWidgets import QComboBox
 

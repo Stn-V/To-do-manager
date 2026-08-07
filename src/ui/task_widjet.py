@@ -1,7 +1,7 @@
 from PySide6.QtCore import Signal, Qt, QMimeData
 from PySide6.QtGui import QDragEnterEvent, QDrag, QMouseEvent
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox
-from model.task import Task, TaskType
+from src.model.task import Task, TaskType
 
 class TaskWidget(QWidget):
     # все сигналы отдают наружу id задачи — конкретные действия
