@@ -1,6 +1,9 @@
 from PySide6.QtCore import Signal, Qt, QMimeData, QEvent
-from PySide6.QtGui import QDragEnterEvent, QDrag, QMouseEvent
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox, QVBoxLayout
+from PySide6.QtGui import QDragEnterEvent, QDrag, QMouseEvent, QColor
+from PySide6.QtWidgets import (
+    QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox,
+    QVBoxLayout, QGraphicsDropShadowEffect,
+)
 from src.model.task import Task, TaskType
 
 class TaskWidget(QWidget):
@@ -19,8 +22,22 @@ class TaskWidget(QWidget):
         self.container_layout = None
 
         self.checkBox = QCheckBox()
+        self.checkBox.setStyleSheet("""
+            QCheckBox::indicator {
+                width: 22px;
+                height: 22px;
+                border-radius: 11px;
+                border: 2px solid #C9C3E8;
+                background: white;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #8B7FD9;
+                border: 2px solid #8B7FD9;
+            }
+        """)
         self.task_label = QLabel()
         self.info_label = QLabel()
+        self.info_label.setStyleSheet("color: #8A85A3; font-size: 12px;")
 
         self.checkBox.stateChanged.connect(self.on_check)
 
@@ -42,6 +59,9 @@ class TaskWidget(QWidget):
         self.view_btn.clicked.connect(self.view_btn_clicked)
         self.delete_btn.clicked.connect(self.delete_btn_clicked)
         self.edit_btn.clicked.connect(self.edit_btn_clicked)
+
+
+
         self.task_label.installEventFilter(self)
         self.info_label.installEventFilter(self)
 
@@ -55,7 +75,25 @@ class TaskWidget(QWidget):
         layout.addWidget(self.view_btn)
         layout.addWidget(self.edit_btn)
         layout.addWidget(self.delete_btn)
+
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(10)
         self.setLayout(layout)
+
+        self.setObjectName("taskCard")
+        self.setStyleSheet("""
+            #taskCard {
+                background-color: #FFFFFF;
+                border-radius: 16px;
+            }
+        """)
+
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(20)
+        shadow.setXOffset(0)
+        shadow.setYOffset(4)
+        shadow.setColor(QColor(139, 127, 217, 40))
+        self.setGraphicsEffect(shadow)
 
         self.refresh()
 

@@ -2,7 +2,7 @@ from datetime import datetime
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
                                QSystemTrayIcon, QStyle, )
-
+from PySide6.QtGui import QFont
 from src.background.notifier import DeadLineNotifier
 from src.ui.task_widjet import TaskWidget
 from src.model.task import TaskType, Task
@@ -15,8 +15,42 @@ from PySide6.QtWidgets import QComboBox
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setGeometry(300, 300, 420, 400)
+        self.setGeometry(300, 300, 420, 500)
         self.setWindowTitle("To-Do Manager")
+        self.setFont(QFont("Segoe UI", 10))
+        self.setStyleSheet("""
+            QMainWindow, QWidget#central {
+                background-color: #EDEBF7;
+            }
+            QPushButton {
+                background-color: #FFFFFF;
+                border: none;
+                border-radius: 14px;
+                padding: 10px 16px;
+                color: #2E2A3D;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #F3F1FB;
+            }
+            QPushButton:pressed {
+                background-color: #8B7FD9;
+                color: white;
+            }
+            QComboBox {
+                background-color: #FFFFFF;
+                border: none;
+                border-radius: 14px;
+                padding: 8px 12px;
+                color: #2E2A3D;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QLabel {
+                color: #2E2A3D;
+            }
+        """)
 
         self.task_manager = TaskManager(
             Storage(str(TASKS_FILE)),
@@ -25,7 +59,10 @@ class MainWindow(QMainWindow):
         self.task_widgets: dict[int, TaskWidget] = {}
 
         central = QWidget()
+        central.setObjectName("central")
         self.layout = QVBoxLayout()
+        self.layout.setContentsMargins(16, 16, 16, 16)
+        self.layout.setSpacing(14)
         central.setLayout(self.layout)
         self.setCentralWidget(central)
 
