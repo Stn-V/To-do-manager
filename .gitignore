@@ -35,7 +35,8 @@ MANIFEST
 
 # Локальные данные приложения (у каждого свои задачи, не для git)
 data/
-
+recurring_tasks.json
+tasks.json
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
