@@ -1,6 +1,6 @@
-from PySide6.QtCore import Signal, Qt, QMimeData
+from PySide6.QtCore import Signal, Qt, QMimeData, QEvent
 from PySide6.QtGui import QDragEnterEvent, QDrag, QMouseEvent
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox, QVBoxLayout
 from src.model.task import Task, TaskType
 
 class TaskWidget(QWidget):
@@ -16,6 +16,7 @@ class TaskWidget(QWidget):
         super().__init__()
         self.task = task
         self.setAcceptDrops(True)
+        self.container_layout = None
 
         self.checkBox = QCheckBox()
         self.task_label = QLabel()
@@ -41,6 +42,8 @@ class TaskWidget(QWidget):
         self.view_btn.clicked.connect(self.view_btn_clicked)
         self.delete_btn.clicked.connect(self.delete_btn_clicked)
         self.edit_btn.clicked.connect(self.edit_btn_clicked)
+        self.task_label.installEventFilter(self)
+        self.info_label.installEventFilter(self)
 
         layout = QHBoxLayout()
         layout.addWidget(self.checkBox)
@@ -87,6 +90,7 @@ class TaskWidget(QWidget):
             self.checkBox.blockSignals(True)
             self.checkBox.setChecked(self.task.is_done())
             self.checkBox.blockSignals(False)
+            self.checkBox.setEnabled(not self.task.is_done())
 
         # оформление
         if self.task.is_done():
@@ -123,32 +127,41 @@ class TaskWidget(QWidget):
     def dragEnterEvent(self, event) -> None:
         event.acceptProposedAction()
 
-    def dropEvent(self, event) -> None:
-        parent = self.parent()
-        if parent is None:
-            return
-        pos = event.position().toPoint()
-        layout = parent.layout()
-        # ищем виджет, на который упал дроп
-        target_index = None
-        for i in range(layout.count()):
-            w = layout.itemAt(i).widget()
-            if w is None:
-                continue
-            if w.geometry().contains(pos):
-                target_index = i
-                break
-        if target_index is None:
-            return
-        self.order_changed.emit(self.task.id, target_index)
-        event.acceptProposedAction()
-
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            drag = QDrag(self)
-            mime = QMimeData()
-            mime.setText(str(self.task.id))
-            drag.setMimeData(mime)
-            drag.exec(Qt.DropAction.MoveAction)
+            self.start_drag()
 
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+            self.start_drag()
+            return True
+        return super().eventFilter(obj, event)
+
+    def start_drag(self) -> None:
+        drag = QDrag(self)
+        mime = QMimeData()
+        mime.setText(str(self.task.id))
+        drag.setMimeData(mime)
+        drag.exec(Qt.DropAction.MoveAction)
+
+    def dragEnterEvent(self, event) -> None:
+        event.acceptProposedAction()
+
+    def dragMoveEvent(self, event) -> None:
+        event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:
+        if self.container_layout is None:
+            return
+        dragged_id_text = event.mimeData().text()
+        if not dragged_id_text.isdigit():
+            return
+        dragged_id = int(dragged_id_text)
+        if dragged_id == self.task.id:
+            return
+        target_index = self.container_layout.indexOf(self)
+        if target_index == -1:
+            return
+        self.order_changed.emit(dragged_id, target_index)
+        event.acceptProposedAction()
 

@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
 
     def _add_widget_for(self, task: Task) -> None:
         widget = TaskWidget(task)
+        widget.container_layout = self.tasks_layout
         self.tasks_layout.addWidget(widget)
         self.task_widgets[task.id] = widget
         widget.deleted.connect(self.task_delete)
