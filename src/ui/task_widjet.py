@@ -4,12 +4,10 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidg
 from src.model.task import Task, TaskType
 
 class TaskWidget(QWidget):
-    # все сигналы отдают наружу id задачи — конкретные действия
-    # (сохранение, удаление, изменение) выполняет TaskManager в MainWindow
     deleted = Signal(int)
     edit_requested = Signal(int)
-    status_changed = Signal(int) #для многоразовых это +1
-    decrement_requested = Signal(int) #для многолразовых это -1
+    status_changed = Signal(int)
+    decrement_requested = Signal(int)
     order_changed = Signal(int, int)
 
     def __init__(self, task: Task):
@@ -62,14 +60,16 @@ class TaskWidget(QWidget):
 
         is_recurring = self.task.task_type == TaskType.RECURRING
 
-        # переключение видимости
         self.checkBox.setVisible(not is_recurring)
         self.minus_btn.setVisible(is_recurring)
         self.plus_btn.setVisible(is_recurring)
         self.counter_label.setVisible(is_recurring)
 
         if is_recurring:
-            self.info_label.setText("🔁 повтор ежедневно")
+            parts = ["🔁 повтор ежедневно"]
+            if self.task.notify_interval_minutes:
+                parts.append(f"🔔 каждые {self.task.notify_interval_minutes} мин")
+            self.info_label.setText(" • ".join(parts))
             self.counter_label.setText(
                 f"{self.task.completions_today}/{self.task.times_per_day}"
             )
@@ -88,7 +88,6 @@ class TaskWidget(QWidget):
             self.checkBox.setChecked(self.task.is_done())
             self.checkBox.blockSignals(False)
 
-        # оформление
         if self.task.is_done():
             self.task_label.setStyleSheet("text-decoration: line-through; color: gray;")
         elif self.task.is_expired():
@@ -97,9 +96,6 @@ class TaskWidget(QWidget):
             self.task_label.setStyleSheet("")
 
     def on_check(self, state) -> None:
-        # галочку можно только ставить — «выполнить» задачу/отметить один
-        # из повторов. Обратный сброс через чекбокс не предусмотрен —
-        # состояние управляется TaskManager'ом и обновляется через refresh()
         if self.checkBox.isChecked():
             self.status_changed.emit(self.task.id)
         else:
@@ -116,10 +112,13 @@ class TaskWidget(QWidget):
     def view_btn_clicked(self) -> None:
         text = self.task.description.strip() if self.task.description else "Описание отсутствует"
         QMessageBox.information(self, self.task.title, text)
+
     def on_minus(self) -> None:
         self.decrement_requested.emit(self.task.id)
+
     def on_plus(self) -> None:
         self.status_changed.emit(self.task.id)
+
     def dragEnterEvent(self, event) -> None:
         event.acceptProposedAction()
 
@@ -129,7 +128,6 @@ class TaskWidget(QWidget):
             return
         pos = event.position().toPoint()
         layout = parent.layout()
-        # ищем виджет, на который упал дроп
         target_index = None
         for i in range(layout.count()):
             w = layout.itemAt(i).widget()
@@ -150,5 +148,4 @@ class TaskWidget(QWidget):
             mime.setText(str(self.task.id))
             drag.setMimeData(mime)
             drag.exec(Qt.DropAction.MoveAction)
-
 

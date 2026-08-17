@@ -1,8 +1,8 @@
-
 from datetime import datetime, timedelta, date
 from typing import Optional, List
 from src.model.task import Task, Status, TaskType
 from src.model.storage import Storage
+
 class TaskManager:
     def __init__(self, storage: Storage, recurring_storage: Storage):
         self.storage = storage
@@ -15,8 +15,6 @@ class TaskManager:
         self.sort_mode = "deadline"
 
     def reset_recurring_if_new_day(self) -> None:
-        """При каждом запуске программы: если наступил новый день — обнуляем счётчик
-        выполнений у постоянных задач, чтобы они снова стали активными."""
         today = date.today()
         changed = False
         for task in self.recurring_tasks:
@@ -28,7 +26,7 @@ class TaskManager:
         if changed:
             self.recurring_storage.save(self.recurring_tasks)
 
-    def generate_id(self)-> int:
+    def generate_id(self) -> int:
         all_ids = [t.id for t in self.one_time_tasks + self.recurring_tasks]
         return max(all_ids) + 1 if all_ids else 1
 
@@ -39,7 +37,6 @@ class TaskManager:
         return None
 
     def add_task(self, title: str, description: str = "", deadline: Optional[datetime] = None, priority: int = 1) -> Task:
-        """Разовая задача — удаляется при выполнении или по истечении дедлайна."""
         task = Task(
             id=self.next_id,
             title=title,
@@ -56,9 +53,14 @@ class TaskManager:
         self.storage.save(self.one_time_tasks)
         return task
 
-    def add_recurring_task(self, title: str, description: str = "", times_per_day: int = 1, priority: int = 1) -> Task:
-        """Постоянная задача — появляется каждый день заново, нужно выполнить
-        times_per_day раз в течение дня (например, попить воды x4)."""
+    def add_recurring_task(
+        self,
+        title: str,
+        description: str = "",
+        times_per_day: int = 1,
+        priority: int = 1,
+        notify_interval_minutes: Optional[int] = None,
+    ) -> Task:
         task = Task(
             id=self.next_id,
             title=title,
@@ -71,6 +73,7 @@ class TaskManager:
             last_reset_date=date.today(),
             priority=priority,
             order=len(self.one_time_tasks) + len(self.recurring_tasks),
+            notify_interval_minutes=notify_interval_minutes,
         )
         self.recurring_tasks.append(task)
         self.next_id += 1
@@ -78,8 +81,6 @@ class TaskManager:
         return task
 
     def complete_task(self, task_id: int) -> None:
-        """Разовая задача при выполнении НЕ удаляется — просто получает статус COMPLETED.
-        Постоянная — увеличивает счётчик выполнений на сегодня."""
         task = self._find(task_id)
         if task is None:
             return
@@ -98,9 +99,6 @@ class TaskManager:
         return self._find(task_id)
 
     def purge_completed_one_time(self) -> None:
-        """Удаляет выполненные разовые задачи. Вызывается при закрытии программы,
-        чтобы в течение сессии выполненная задача была видна (зачёркнута),
-        а при следующем запуске уже не отображалась."""
         before = len(self.one_time_tasks)
         self.one_time_tasks = [
             t for t in self.one_time_tasks if t.status != Status.COMPLETED
@@ -109,16 +107,15 @@ class TaskManager:
             self.storage.save(self.one_time_tasks)
 
     def edit_task(
-            self,
-            task_id: int,
-            title: str,
-            description: Optional[str] = None,
-            deadline: Optional[datetime] = None,
-            times_per_day: Optional[int] = None,
-            priority: Optional[int] = None,
+        self,
+        task_id: int,
+        title: str,
+        description: Optional[str] = None,
+        deadline: Optional[datetime] = None,
+        times_per_day: Optional[int] = None,
+        priority: Optional[int] = None,
+        notify_interval_minutes: Optional[int] = None,
     ) -> None:
-        """Редактирование задачи. Для ONE_TIME обновляется дедлайн (None — снять дедлайн),
-        для RECURRING — сколько раз в день нужно выполнить."""
         task = self._find(task_id)
         if task is None:
             return
@@ -137,10 +134,11 @@ class TaskManager:
                 task.times_per_day = max(1, times_per_day)
                 if task.completions_today > task.times_per_day:
                     task.completions_today = task.times_per_day
+            if notify_interval_minutes is not None:
+                task.notify_interval_minutes = notify_interval_minutes if notify_interval_minutes > 0 else None
             self.recurring_storage.save(self.recurring_tasks)
 
     def delete_task(self, task_id: int) -> None:
-        """Ручное удаление задачи любого типа."""
         task = self._find(task_id)
         if task is None:
             return
@@ -153,7 +151,6 @@ class TaskManager:
             self.recurring_storage.save(self.recurring_tasks)
 
     def list_tasks(self, include_done: bool = True) -> List[Task]:
-        # сначала выбираем базовый список по режиму сортировки
         if self.sort_mode == "deadline":
             tasks = self.sorted_by_deadline()
         elif self.sort_mode == "priority":
@@ -174,28 +171,44 @@ class TaskManager:
             for t in self.one_time_tasks
             if not t.is_done() and t.deadline and now <= t.deadline <= threshold
         ]
+
+    def get_recurring_to_notify(self) -> List[Task]:
+        """Возвращает recurring-задачи, по которым нужно отправить уведомление."""
+        now = datetime.now()
+        result = []
+        for task in self.recurring_tasks:
+            if task.notify_interval_minutes is None:
+                continue
+            if task.is_done():
+                continue
+            result.append(task)
+        return result
+
     def decrement_task(self, task_id: int) -> None:
         task = self._find(task_id)
         if task is None or task.task_type != TaskType.RECURRING:
             return
-        if task.completions_today >0:
+        if task.completions_today > 0:
             task.completions_today -= 1
             if task.completions_today < task.times_per_day:
                 task.status = Status.TODO
-            self.storage.save(self.recurring_tasks)
+            self.recurring_storage.save(self.recurring_tasks)
 
     def sorted_by_deadline(self) -> List[Task]:
         tasks = self.one_time_tasks + self.recurring_tasks
         return sorted(tasks, key=lambda t: (t.deadline is None, t.deadline or datetime.max))
+
     def sorted_by_priority(self) -> List[Task]:
         tasks = self.one_time_tasks + self.recurring_tasks
-        return sorted(tasks, key= lambda t: (-t.priority, t.deadline or datetime.max))
+        return sorted(tasks, key=lambda t: (-t.priority, t.deadline or datetime.max))
+
     def sorted_by_order(self):
         tasks = self.one_time_tasks + self.recurring_tasks
         return sorted(tasks, key=lambda t: t.order)
-    def update_order(self, task_id : int, new_index: int ) -> None:
+
+    def update_order(self, task_id: int, new_index: int) -> None:
         tasks = self.one_time_tasks + self.recurring_tasks
-        tasks = sorted(tasks, key = lambda t: t.order)
+        tasks = sorted(tasks, key=lambda t: t.order)
         old_index = None
         for i, task in enumerate(tasks):
             if task.id == task_id:
