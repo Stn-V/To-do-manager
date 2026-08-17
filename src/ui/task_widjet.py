@@ -2,18 +2,26 @@ from PySide6.QtCore import Signal, Qt, QMimeData, QEvent
 from PySide6.QtGui import QDragEnterEvent, QDrag, QMouseEvent, QColor
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QCheckBox, QWidget, QMessageBox,
-    QVBoxLayout, QGraphicsDropShadowEffect,
+    QVBoxLayout, QGraphicsDropShadowEffect, QFrame, QSizePolicy,
 )
 from src.model.task import Task, TaskType
+
 
 class TaskWidget(QWidget):
     # все сигналы отдают наружу id задачи — конкретные действия
     # (сохранение, удаление, изменение) выполняет TaskManager в MainWindow
     deleted = Signal(int)
     edit_requested = Signal(int)
-    status_changed = Signal(int) #для многоразовых это +1
-    decrement_requested = Signal(int) #для многолразовых это -1
+    status_changed = Signal(int)  # для многоразовых это +1
+    decrement_requested = Signal(int)  # для многоразовых это -1
     order_changed = Signal(int, int)
+
+    # цвет полоски приоритета: низкий -> зелёный, средний -> жёлтый, высокий -> красный
+    _PRIORITY_COLORS = [
+        (3, "#8FD9B6"),   # 1-3  низкий
+        (6, "#F3C969"),   # 4-6  средний
+        (10, "#EF8C82"),  # 7-10 высокий
+    ]
 
     def __init__(self, task: Task):
         super().__init__()
@@ -21,6 +29,12 @@ class TaskWidget(QWidget):
         self.setAcceptDrops(True)
         self.container_layout = None
 
+        # ---------- полоска приоритета слева ----------
+        self.priority_strip = QFrame()
+        self.priority_strip.setFixedWidth(6)
+        self.priority_strip.setObjectName("priorityStrip")
+
+        # ---------- чекбокс / счётчик повторов ----------
         self.checkBox = QCheckBox()
         self.checkBox.setStyleSheet("""
             QCheckBox::indicator {
@@ -35,67 +49,163 @@ class TaskWidget(QWidget):
                 border: 2px solid #8B7FD9;
             }
         """)
-        self.task_label = QLabel()
-        self.info_label = QLabel()
-        self.info_label.setStyleSheet("color: #8A85A3; font-size: 12px;")
-
-        self.checkBox.stateChanged.connect(self.on_check)
 
         self.minus_btn = QPushButton("➖")
         self.counter_label = QLabel()
+        self.counter_label.setObjectName("counterLabel")
         self.plus_btn = QPushButton("➕")
-        self.minus_btn.setFixedWidth(28)
-        self.plus_btn.setFixedWidth(28)
+        self.minus_btn.setFixedSize(26, 26)
+        self.plus_btn.setFixedSize(26, 26)
+        self.minus_btn.setObjectName("miniBtn")
+        self.plus_btn.setObjectName("miniBtn")
         self.minus_btn.setToolTip("Отменить одно выполнение")
         self.plus_btn.setToolTip("Засчитать выполнение")
         self.minus_btn.clicked.connect(self.on_minus)
         self.plus_btn.clicked.connect(self.on_plus)
 
+        # ---------- текстовая часть ----------
+        self.task_label = QLabel()
+        self.task_label.setObjectName("taskTitle")
+
+        self.info_label = QLabel()
+        self.info_label.setObjectName("infoBadge")
+
+        self.priority_label = QLabel()
+        self.priority_label.setObjectName("priorityBadge")
+
+        self.checkBox.stateChanged.connect(self.on_check)
+
+        # ---------- кнопки действий ----------
         self.view_btn = QPushButton("👁")
         self.edit_btn = QPushButton("✏️")
         self.delete_btn = QPushButton("🗑️")
+        for btn in (self.view_btn, self.edit_btn, self.delete_btn):
+            btn.setObjectName("iconBtn")
+            btn.setFixedSize(32, 32)
 
         self.view_btn.setToolTip("Показать описание")
+        self.delete_btn.setToolTip("Удалить задачу")
+        self.edit_btn.setToolTip("Редактировать задачу")
         self.view_btn.clicked.connect(self.view_btn_clicked)
         self.delete_btn.clicked.connect(self.delete_btn_clicked)
         self.edit_btn.clicked.connect(self.edit_btn_clicked)
 
-
-
         self.task_label.installEventFilter(self)
         self.info_label.installEventFilter(self)
 
-        layout = QHBoxLayout()
-        layout.addWidget(self.checkBox)
-        layout.addWidget(self.minus_btn)
-        layout.addWidget(self.plus_btn)
-        layout.addWidget(self.counter_label)
-        layout.addWidget(self.task_label)
-        layout.addWidget(self.info_label)
-        layout.addWidget(self.view_btn)
-        layout.addWidget(self.edit_btn)
-        layout.addWidget(self.delete_btn)
+        # ---------- раскладка ----------
+        # верхняя строка: чекбокс/счётчик + заголовок + кнопки действий
+        top_row = QHBoxLayout()
+        top_row.setSpacing(8)
+        top_row.addWidget(self.checkBox)
+        top_row.addWidget(self.minus_btn)
+        top_row.addWidget(self.counter_label)
+        top_row.addWidget(self.plus_btn)
+        top_row.addWidget(self.task_label, 1)
+        top_row.addWidget(self.view_btn)
+        top_row.addWidget(self.edit_btn)
+        top_row.addWidget(self.delete_btn)
 
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(10)
-        self.setLayout(layout)
+        # нижняя строка: бейджи с датой/повтором и приоритетом
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(8)
+        bottom_row.addWidget(self.info_label)
+        bottom_row.addWidget(self.priority_label)
+        bottom_row.addStretch(1)
+
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(14, 12, 14, 12)
+        content_layout.setSpacing(8)
+        content_layout.addLayout(top_row)
+        content_layout.addLayout(bottom_row)
+
+        content_widget = QWidget()
+        content_widget.setLayout(content_layout)
+
+        outer_layout = QHBoxLayout()
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+        outer_layout.addWidget(self.priority_strip)
+        outer_layout.addWidget(content_widget, 1)
+        self.setLayout(outer_layout)
 
         self.setObjectName("taskCard")
         self.setStyleSheet("""
             #taskCard {
                 background-color: #FFFFFF;
+                border: 1px solid #E1DCF7;
                 border-radius: 16px;
+            }
+            #taskCard:hover {
+                border: 1px solid #B9AEEF;
+            }
+            #priorityStrip {
+                border-top-left-radius: 16px;
+                border-bottom-left-radius: 16px;
+            }
+            #taskTitle {
+                font-size: 14px;
+                font-weight: 600;
+                color: #2E2A3D;
+            }
+            #infoBadge {
+                background-color: #F1EEFC;
+                color: #6E68A0;
+                font-size: 11px;
+                font-weight: 500;
+                border-radius: 9px;
+                padding: 3px 10px;
+            }
+            #priorityBadge {
+                font-size: 11px;
+                font-weight: 600;
+                border-radius: 9px;
+                padding: 3px 10px;
+                color: white;
+            }
+            #counterLabel {
+                font-size: 12px;
+                font-weight: 600;
+                color: #6E68A0;
+                min-width: 32px;
+                qproperty-alignment: AlignCenter;
+            }
+            QPushButton#miniBtn {
+                border-radius: 13px;
+                background-color: #F1EEFC;
+                border: none;
+                padding: 0px;
+            }
+            QPushButton#miniBtn:hover {
+                background-color: #E1DCF7;
+            }
+            QPushButton#iconBtn {
+                border-radius: 16px;
+                background-color: transparent;
+                border: none;
+                padding: 0px;
+            }
+            QPushButton#iconBtn:hover {
+                background-color: #F1EEFC;
             }
         """)
 
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(20)
+        shadow.setBlurRadius(22)
         shadow.setXOffset(0)
         shadow.setYOffset(4)
-        shadow.setColor(QColor(139, 127, 217, 40))
+        shadow.setColor(QColor(139, 127, 217, 45))
         self.setGraphicsEffect(shadow)
 
         self.refresh()
+
+    # ---------- вспомогательное ----------
+
+    def _priority_color(self) -> str:
+        for threshold, color in self._PRIORITY_COLORS:
+            if self.task.priority <= threshold:
+                return color
+        return self._PRIORITY_COLORS[-1][1]
 
     def refresh(self) -> None:
         self.task_label.setText(self.task.title)
@@ -110,18 +220,15 @@ class TaskWidget(QWidget):
         self.counter_label.setVisible(is_recurring)
 
         if is_recurring:
-            self.info_label.setText("🔁 повтор ежедневно")
-            self.counter_label.setText(
-                f"{self.task.completions_today}/{self.task.times_per_day}"
-            )
+            self.info_label.setText(f"🔁  {self.task.completions_today}/{self.task.times_per_day} сегодня")
+            self.counter_label.setText(f"{self.task.completions_today}/{self.task.times_per_day}")
 
             done = self.task.is_done()
             self.plus_btn.setEnabled(not done)
             self.minus_btn.setEnabled(self.task.completions_today > 0)
-
         else:
             if self.task.deadline:
-                self.info_label.setText(f"до {self.task.deadline:%d.%m %H:%M}")
+                self.info_label.setText(f"🕒  до {self.task.deadline:%d.%m %H:%M}")
             else:
                 self.info_label.setText("без дедлайна")
 
@@ -130,13 +237,41 @@ class TaskWidget(QWidget):
             self.checkBox.blockSignals(False)
             self.checkBox.setEnabled(not self.task.is_done())
 
-        # оформление
+        # бейдж приоритета
+        color = self._priority_color()
+        self.priority_label.setText(f"★ {self.task.priority}")
+        self.priority_label.setStyleSheet(f"""
+            #priorityBadge {{
+                background-color: {color};
+                font-size: 11px;
+                font-weight: 600;
+                border-radius: 9px;
+                padding: 3px 10px;
+                color: white;
+            }}
+        """)
+        # полоска слева
+        self.priority_strip.setStyleSheet(f"""
+            #priorityStrip {{
+                background-color: {color};
+                border-top-left-radius: 16px;
+                border-bottom-left-radius: 16px;
+            }}
+        """)
+
+        # оформление заголовка в зависимости от статуса
         if self.task.is_done():
-            self.task_label.setStyleSheet("text-decoration: line-through; color: gray;")
+            self.task_label.setStyleSheet("""
+                #taskTitle { text-decoration: line-through; color: #A9A4C0; font-weight: 500; }
+            """)
         elif self.task.is_expired():
-            self.task_label.setStyleSheet("color: red; font-weight: bold;")
+            self.task_label.setStyleSheet("""
+                #taskTitle { color: #D9534F; font-weight: 700; }
+            """)
         else:
-            self.task_label.setStyleSheet("")
+            self.task_label.setStyleSheet("""
+                #taskTitle { color: #2E2A3D; font-weight: 600; }
+            """)
 
     def on_check(self, state) -> None:
         # галочку можно только ставить — «выполнить» задачу/отметить один
@@ -158,12 +293,12 @@ class TaskWidget(QWidget):
     def view_btn_clicked(self) -> None:
         text = self.task.description.strip() if self.task.description else "Описание отсутствует"
         QMessageBox.information(self, self.task.title, text)
+
     def on_minus(self) -> None:
         self.decrement_requested.emit(self.task.id)
+
     def on_plus(self) -> None:
         self.status_changed.emit(self.task.id)
-    def dragEnterEvent(self, event) -> None:
-        event.acceptProposedAction()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -202,4 +337,3 @@ class TaskWidget(QWidget):
             return
         self.order_changed.emit(dragged_id, target_index)
         event.acceptProposedAction()
-

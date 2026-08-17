@@ -69,6 +69,8 @@ class MainWindow(QMainWindow):
         # список задач — отдельный вложенный layout, чтобы новые задачи
         # добавлялись выше кнопок, а не после них
         self.tasks_layout = QVBoxLayout()
+        self.tasks_layout.setSpacing(10)
+        self.tasks_layout.setContentsMargins(0, 0, 0, 4)
         self.layout.addLayout(self.tasks_layout)
 
         self.render_tasks()
@@ -301,5 +303,4 @@ class MainWindow(QMainWindow):
         mode = self.sort_combo.itemData(index)
         self.task_manager.sort_mode = mode
         self._rerender_all_tasks()
-
 
