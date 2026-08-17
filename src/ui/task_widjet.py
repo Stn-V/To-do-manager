@@ -8,8 +8,6 @@ from src.model.task import Task, TaskType
 
 
 class TaskWidget(QWidget):
-    # все сигналы отдают наружу id задачи — конкретные действия
-    # (сохранение, удаление, изменение) выполняет TaskManager в MainWindow
     deleted = Signal(int)
     edit_requested = Signal(int)
     status_changed = Signal(int)  # для многоразовых это +1
@@ -213,15 +211,19 @@ class TaskWidget(QWidget):
 
         is_recurring = self.task.task_type == TaskType.RECURRING
 
-        # переключение видимости
         self.checkBox.setVisible(not is_recurring)
         self.minus_btn.setVisible(is_recurring)
         self.plus_btn.setVisible(is_recurring)
         self.counter_label.setVisible(is_recurring)
 
         if is_recurring:
-            self.info_label.setText(f"🔁  {self.task.completions_today}/{self.task.times_per_day} сегодня")
-            self.counter_label.setText(f"{self.task.completions_today}/{self.task.times_per_day}")
+            parts = ["🔁 повтор ежедневно"]
+            if self.task.notify_interval_minutes:
+                parts.append(f"🔔 каждые {self.task.notify_interval_minutes} мин")
+            self.info_label.setText(" • ".join(parts))
+            self.counter_label.setText(
+                f"{self.task.completions_today}/{self.task.times_per_day}"
+            )
 
             done = self.task.is_done()
             self.plus_btn.setEnabled(not done)
@@ -274,9 +276,6 @@ class TaskWidget(QWidget):
             """)
 
     def on_check(self, state) -> None:
-        # галочку можно только ставить — «выполнить» задачу/отметить один
-        # из повторов. Обратный сброс через чекбокс не предусмотрен —
-        # состояние управляется TaskManager'ом и обновляется через refresh()
         if self.checkBox.isChecked():
             self.status_changed.emit(self.task.id)
         else:

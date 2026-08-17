@@ -68,8 +68,6 @@ class MainWindow(QMainWindow):
         central.setLayout(self.layout)
         self.tasks_page = central  # страница "Задачи" внутреннего стека
 
-        # список задач — отдельный вложенный layout, чтобы новые задачи
-        # добавлялись выше кнопок, а не после них
         self.tasks_layout = QVBoxLayout()
         self.tasks_layout.setSpacing(10)
         self.tasks_layout.setContentsMargins(0, 0, 0, 4)
@@ -196,8 +194,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.ui_refresh_timer.stop()
         self.notifier.stop()
-        # выполненные разовые задачи остаются видимыми (зачёркнутыми) в течение
-        # сессии, но удаляются насовсем при закрытии программы
         self.task_manager.purge_completed_one_time()
         super().closeEvent(event)
 
@@ -263,6 +259,13 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
+        interval, ok = QInputDialog.getInt(
+            self, "Интервал уведомлений",
+            "Уведомлять каждые N минут (0 — без уведомлений):",
+            value=0, minValue=0, maxValue=1440,
+        )
+        if not ok:
+            return
         priority, ok = QInputDialog.getInt(
             self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10
         )
@@ -273,6 +276,7 @@ class MainWindow(QMainWindow):
             description=description.strip(),
             times_per_day=times,
             priority=priority,
+            notify_interval_minutes=interval if interval > 0 else None,
         )
         self._add_widget_for(task)
 
@@ -286,8 +290,6 @@ class MainWindow(QMainWindow):
         except ValueError:
             return None
 
-    # ---------- обработка сигналов от TaskWidget ----------
-
     def task_delete(self, task_id: int) -> None:
         self.task_manager.delete_task(task_id)
         self._remove_widget(task_id)
@@ -296,10 +298,8 @@ class MainWindow(QMainWindow):
         self.task_manager.complete_task(task_id)
         task = self.task_manager.get_task(task_id)
         if task is None:
-            # разовая задача выполнена и удалена TaskManager'ом
             self._remove_widget(task_id)
         else:
-            # постоянная задача — просто обновляем счётчик "N/M раз сегодня"
             widget = self.task_widgets[task_id]
             widget.task = task
             widget.refresh()
@@ -338,7 +338,7 @@ class MainWindow(QMainWindow):
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
                 deadline=self._parse_deadline(dt_text),
-                priority = new_priority
+                priority=new_priority
             )
         else:
             new_times, ok = QInputDialog.getInt(
@@ -347,10 +347,19 @@ class MainWindow(QMainWindow):
             )
             if not ok:
                 return
+            current_interval = task.notify_interval_minutes if task.notify_interval_minutes else 0
+            new_interval, ok = QInputDialog.getInt(
+                self, "Интервал уведомлений",
+                "Уведомлять каждые N минут (0 — без уведомлений):",
+                value=current_interval, minValue=0, maxValue=1440,
+            )
+            if not ok:
+                return
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
                 times_per_day=new_times,
-                priority = new_priority
+                priority=new_priority,
+                notify_interval_minutes=new_interval if new_interval > 0 else None,
             )
 
         updated = self.task_manager.get_task(task_id)
@@ -377,12 +386,10 @@ class MainWindow(QMainWindow):
         self._rerender_all_tasks()
 
     def _rerender_all_tasks(self) -> None:
-        # удаляем все виджеты
         for widget in self.task_widgets.values():
             self.tasks_layout.removeWidget(widget)
             widget.deleteLater()
         self.task_widgets.clear()
-        # создаём заново в новом порядке
         for task in self.task_manager.list_tasks():
             self._add_widget_for(task)
 
