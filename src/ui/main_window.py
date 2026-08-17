@@ -1,13 +1,12 @@
-from datetime import datetime
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
-                               QSystemTrayIcon, QStyle, QStackedWidget, QDialog, )
+from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QDialog,
+                               QSystemTrayIcon, QStyle, QStackedWidget, )
 from PySide6.QtGui import QFont
 from src.background.notifier import DeadLineNotifier
 from src.ui.task_widjet import TaskWidget
 from src.ui.welcome_screen import WelcomeScreen
 from src.ui.calendar_page import CalendarPage
-from src.ui.deadline_picker import DeadlinePickerDialog
+from src.ui.task_dialog import TaskDialog
 from src.model.task import TaskType, Task
 from src.model.task_manager import TaskManager
 from src.model.storage import Storage
@@ -229,62 +228,31 @@ class MainWindow(QMainWindow):
         widget.deleteLater()
 
     def add_one_time_task(self) -> None:
-        title, ok = QInputDialog.getText(self, "Новая задача", "Название:")
-        if not ok or not title.strip():
+        dialog = TaskDialog(self, task_type=TaskType.ONE_TIME)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        description, ok = QInputDialog.getMultiLineText(
-            self, "Описание", "Описание задачи (можно оставить пустым):"
-        )
-        if not ok:
-            return
-        deadline_dialog = DeadlinePickerDialog(self)
-        if deadline_dialog.exec() != QDialog.DialogCode.Accepted:
-            return
-        deadline = deadline_dialog.get_datetime()
-        priority, ok = QInputDialog.getInt(self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10)
-        if not ok:
-            return
+        values = dialog.get_values()
         task = self.task_manager.add_task(
-            title.strip(), description=description.strip(), deadline=deadline, priority=priority,
+            values["title"],
+            description=values["description"],
+            deadline=values["deadline"],
+            priority=values["priority"],
         )
         self._add_widget_for(task)
 
     def add_recurring_task(self) -> None:
-        title, ok = QInputDialog.getText(self, "Новая постоянная задача", "Название:")
-        if not ok or not title.strip():
+        dialog = TaskDialog(self, task_type=TaskType.RECURRING)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        description, ok = QInputDialog.getMultiLineText(
-            self, "Описание", "Описание задачи (можно оставить пустым):"
-        )
-        if not ok:
-            return
-        times, ok = QInputDialog.getInt(
-            self, "Сколько раз в день", "Раз в день:", value=1, minValue=1, maxValue=50
-        )
-        if not ok:
-            return
-        priority, ok = QInputDialog.getInt(
-            self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10
-        )
-        if not ok:
-            return
+        values = dialog.get_values()
         task = self.task_manager.add_recurring_task(
-            title.strip(),
-            description=description.strip(),
-            times_per_day=times,
-            priority=priority,
+            values["title"],
+            description=values["description"],
+            times_per_day=values["times_per_day"],
+            priority=values["priority"],
+            notify_interval_minutes=values["notify_interval_minutes"],
         )
         self._add_widget_for(task)
-
-    @staticmethod
-    def _parse_deadline(text: str):
-        text = text.strip()
-        if not text:
-            return None
-        try:
-            return datetime.strptime(text, "%d.%m.%Y %H:%M")
-        except ValueError:
-            return None
 
     # ---------- обработка сигналов от TaskWidget ----------
 
@@ -309,45 +277,27 @@ class MainWindow(QMainWindow):
         if task is None:
             return
 
-        new_title, ok = QInputDialog.getText(
-            self, "Редактирование задачи", "Название:", text=task.title
-        )
-        if not ok or not new_title.strip():
+        dialog = TaskDialog(self, task_type=task.task_type, task=task)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-
-        new_description, ok = QInputDialog.getMultiLineText(
-            self, "Описание", "Описание задачи (можно оставить пустым):", text=task.description
-        )
-        if not ok:
-            return
-        new_priority, ok = QInputDialog.getInt(
-            self, "Приоритет", "Приоритет (1–10):",
-            value=task.priority, minValue=1, maxValue=10,
-        )
-        if not ok:
-            return
+        values = dialog.get_values()
 
         if task.task_type == TaskType.ONE_TIME:
-            deadline_dialog = DeadlinePickerDialog(self, current=task.deadline)
-            if deadline_dialog.exec() != QDialog.DialogCode.Accepted:
-                return
-            new_deadline = deadline_dialog.get_datetime()
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), description=new_description.strip(),
-                deadline=new_deadline,
-                priority = new_priority
+                task_id,
+                title=values["title"],
+                description=values["description"],
+                deadline=values["deadline"],
+                priority=values["priority"],
             )
         else:
-            new_times, ok = QInputDialog.getInt(
-                self, "Сколько раз в день", "Раз в день:",
-                value=task.times_per_day, minValue=1, maxValue=50,
-            )
-            if not ok:
-                return
             self.task_manager.edit_task(
-                task_id, title=new_title.strip(), description=new_description.strip(),
-                times_per_day=new_times,
-                priority = new_priority
+                task_id,
+                title=values["title"],
+                description=values["description"],
+                times_per_day=values["times_per_day"],
+                priority=values["priority"],
+                notify_interval_minutes=values["notify_interval_minutes"],
             )
 
         updated = self.task_manager.get_task(task_id)
