@@ -8,9 +8,7 @@ from src.model.task_manager import TaskManager
 
 
 class CalendarPage(QWidget):
-    """Страница с календарём: дни с дедлайнами подсвечены, под календарём —
-    список задач на выбранный день. В отличие от старой версии, это НЕ
-    всплывающее окно, а обычная страница, встроенная во внутренний
+    """обычная страница, встроенная во внутренний
     QStackedWidget в MainWindow — переключается кнопкой в нижней панели."""
 
     def __init__(self, task_manager: TaskManager):
@@ -118,31 +116,57 @@ class CalendarPage(QWidget):
         year = self.calendar.yearShown()
         month = self.calendar.monthShown()
         days_in_month = QDate(year, month, 1).daysInMonth()
+        today = QDate.currentDate()
 
-        empty_format = QTextCharFormat()
-        for day in range(1, days_in_month + 1):
-            self.calendar.setDateTextFormat(QDate(year, month, day), empty_format)
+        bold_font = QFont()
+        bold_font.setBold(True)
 
         deadline_format = QTextCharFormat()
         deadline_format.setBackground(QColor("#8B7FD9"))
         deadline_format.setForeground(QColor("white"))
-        font = QFont()
-        font.setBold(True)
-        deadline_format.setFont(font)
+        deadline_format.setFont(bold_font)
 
         overdue_format = QTextCharFormat()
         overdue_format.setBackground(QColor("#EF8C82"))
         overdue_format.setForeground(QColor("white"))
-        overdue_format.setFont(font)
+        overdue_format.setFont(bold_font)
 
+        today_font = QFont()
+        today_font.setBold(True)
+        today_font.setUnderline(True)
+
+        today_format = QTextCharFormat()
+        today_format.setBackground(QColor("#E1DCF7"))
+        today_format.setForeground(QColor("#4B3F91"))
+        today_format.setFont(today_font)
+
+        # какие дни этого месяца имеют дедлайн, и есть ли среди них просроченный
+        deadline_days: dict[int, bool] = {}
         for task in self.task_manager.one_time_tasks:
             if not task.deadline:
                 continue
             d = task.deadline.date()
             if d.year == year and d.month == month:
-                qdate = QDate(d.year, d.month, d.day)
-                fmt = overdue_format if task.is_expired() else deadline_format
-                self.calendar.setDateTextFormat(qdate, fmt)
+                deadline_days[d.day] = deadline_days.get(d.day, False) or task.is_expired()
+
+        for day in range(1, days_in_month + 1):
+            qdate = QDate(year, month, day)
+            is_today = qdate == today
+
+            if day in deadline_days:
+                # день с дедлайном: берём цвет дедлайна/просрочки,
+                # а если это ещё и сегодня — добавляем подчёркивание-маркер
+                fmt = QTextCharFormat(overdue_format if deadline_days[day] else deadline_format)
+                if is_today:
+                    f = fmt.font()
+                    f.setUnderline(True)
+                    fmt.setFont(f)
+            elif is_today:
+                fmt = today_format
+            else:
+                fmt = QTextCharFormat()
+
+            self.calendar.setDateTextFormat(qdate, fmt)
 
     # ---------- список задач на выбранный день ----------
 

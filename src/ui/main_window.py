@@ -1,12 +1,13 @@
 from datetime import datetime
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QInputDialog,
-                               QSystemTrayIcon, QStyle, QStackedWidget, )
+                               QSystemTrayIcon, QStyle, QStackedWidget, QDialog, )
 from PySide6.QtGui import QFont
 from src.background.notifier import DeadLineNotifier
 from src.ui.task_widjet import TaskWidget
 from src.ui.welcome_screen import WelcomeScreen
 from src.ui.calendar_page import CalendarPage
+from src.ui.deadline_picker import DeadlinePickerDialog
 from src.model.task import TaskType, Task
 from src.model.task_manager import TaskManager
 from src.model.storage import Storage
@@ -68,6 +69,8 @@ class MainWindow(QMainWindow):
         central.setLayout(self.layout)
         self.tasks_page = central  # страница "Задачи" внутреннего стека
 
+        # список задач — отдельный вложенный layout, чтобы новые задачи
+        # добавлялись выше кнопок, а не после них
         self.tasks_layout = QVBoxLayout()
         self.tasks_layout.setSpacing(10)
         self.tasks_layout.setContentsMargins(0, 0, 0, 4)
@@ -194,6 +197,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.ui_refresh_timer.stop()
         self.notifier.stop()
+        # выполненные разовые задачи остаются видимыми (зачёркнутыми) в течение
+        # сессии, но удаляются насовсем при закрытии программы
         self.task_manager.purge_completed_one_time()
         super().closeEvent(event)
 
@@ -232,16 +237,15 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
-        dt_text, ok = QInputDialog.getText(
-            self, "Дедлайн", "Дедлайн (ДД.ММ.ГГГГ ЧЧ:ММ, можно оставить пустым):"
-        )
-        if not ok:
+        deadline_dialog = DeadlinePickerDialog(self)
+        if deadline_dialog.exec() != QDialog.DialogCode.Accepted:
             return
+        deadline = deadline_dialog.get_datetime()
         priority, ok = QInputDialog.getInt(self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10)
         if not ok:
             return
         task = self.task_manager.add_task(
-            title.strip(), description=description.strip(), deadline=self._parse_deadline(dt_text), priority=priority,
+            title.strip(), description=description.strip(), deadline=deadline, priority=priority,
         )
         self._add_widget_for(task)
 
@@ -259,13 +263,6 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
-        interval, ok = QInputDialog.getInt(
-            self, "Интервал уведомлений",
-            "Уведомлять каждые N минут (0 — без уведомлений):",
-            value=0, minValue=0, maxValue=1440,
-        )
-        if not ok:
-            return
         priority, ok = QInputDialog.getInt(
             self, "Приоритет", "Приоритет (1–10):", value=1, minValue=1, maxValue=10
         )
@@ -276,7 +273,6 @@ class MainWindow(QMainWindow):
             description=description.strip(),
             times_per_day=times,
             priority=priority,
-            notify_interval_minutes=interval if interval > 0 else None,
         )
         self._add_widget_for(task)
 
@@ -290,6 +286,8 @@ class MainWindow(QMainWindow):
         except ValueError:
             return None
 
+    # ---------- обработка сигналов от TaskWidget ----------
+
     def task_delete(self, task_id: int) -> None:
         self.task_manager.delete_task(task_id)
         self._remove_widget(task_id)
@@ -298,8 +296,10 @@ class MainWindow(QMainWindow):
         self.task_manager.complete_task(task_id)
         task = self.task_manager.get_task(task_id)
         if task is None:
+            # разовая задача выполнена и удалена TaskManager'ом
             self._remove_widget(task_id)
         else:
+            # постоянная задача — просто обновляем счётчик "N/M раз сегодня"
             widget = self.task_widgets[task_id]
             widget.task = task
             widget.refresh()
@@ -328,17 +328,14 @@ class MainWindow(QMainWindow):
             return
 
         if task.task_type == TaskType.ONE_TIME:
-            current = task.deadline.strftime("%d.%m.%Y %H:%M") if task.deadline else ""
-            dt_text, ok = QInputDialog.getText(
-                self, "Дедлайн", "Дедлайн (ДД.ММ.ГГГГ ЧЧ:ММ, можно оставить пустым):",
-                text=current,
-            )
-            if not ok:
+            deadline_dialog = DeadlinePickerDialog(self, current=task.deadline)
+            if deadline_dialog.exec() != QDialog.DialogCode.Accepted:
                 return
+            new_deadline = deadline_dialog.get_datetime()
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
-                deadline=self._parse_deadline(dt_text),
-                priority=new_priority
+                deadline=new_deadline,
+                priority = new_priority
             )
         else:
             new_times, ok = QInputDialog.getInt(
@@ -347,19 +344,10 @@ class MainWindow(QMainWindow):
             )
             if not ok:
                 return
-            current_interval = task.notify_interval_minutes if task.notify_interval_minutes else 0
-            new_interval, ok = QInputDialog.getInt(
-                self, "Интервал уведомлений",
-                "Уведомлять каждые N минут (0 — без уведомлений):",
-                value=current_interval, minValue=0, maxValue=1440,
-            )
-            if not ok:
-                return
             self.task_manager.edit_task(
                 task_id, title=new_title.strip(), description=new_description.strip(),
                 times_per_day=new_times,
-                priority=new_priority,
-                notify_interval_minutes=new_interval if new_interval > 0 else None,
+                priority = new_priority
             )
 
         updated = self.task_manager.get_task(task_id)
@@ -386,10 +374,12 @@ class MainWindow(QMainWindow):
         self._rerender_all_tasks()
 
     def _rerender_all_tasks(self) -> None:
+        # удаляем все виджеты
         for widget in self.task_widgets.values():
             self.tasks_layout.removeWidget(widget)
             widget.deleteLater()
         self.task_widgets.clear()
+        # создаём заново в новом порядке
         for task in self.task_manager.list_tasks():
             self._add_widget_for(task)
 
