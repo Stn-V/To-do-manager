@@ -35,8 +35,13 @@ MANIFEST
 
 # Локальные данные приложения (у каждого свои задачи, не для git)
 data/
-recurring_tasks.json
-tasks.json
+
+# Сгенерированная иконка (создаётся из src/logo.png скриптом create_icon.py)
+app_icon.ico
+
+# Папка с готовым установщиком — НЕ коммитим бинарники!
+
+installer_output/
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
