@@ -25,6 +25,7 @@ class Task:
     last_reset_date: Optional[date] = None  # когда последний раз обнулялся счётчик
     priority: int = 1 #1 = низкий, 5 = высокий
     order:int = 0 #позиция в списке при ручной сортировке
+    notify_interval_minutes: Optional[int] = None # интервал уведомлений (мин)
 
     def to_dict(self) -> dict:
         return {
